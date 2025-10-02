@@ -2,6 +2,8 @@
 
 这是一个基于 [Expo](https://expo.dev) 和 React Native 开发的宝可梦图鉴移动应用，使用 [PokeAPI](https://pokeapi.co/) 获取宝可梦数据。
 
+> 🤖 **此项目使用 [Claude Code](https://claude.com/claude-code) 开发** - 完全由AI助手编写和维护的代码库。
+
 ## 功能特性
 
 - 📋 浏览所有宝可梦 - 无限滚动列表，显示宝可梦序号、中英文名称、类型

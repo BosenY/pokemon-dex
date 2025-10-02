@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> 🤖 **Claude Code Project** - This project was created and is maintained entirely with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding assistant.
+
 ## Project Overview
 This is an Expo React Native project using Expo Router for file-based routing. The app is a Pokémon Pokédex that displays information about Pokémon, including their stats, abilities, evolutions, and more. The app follows a tab-based navigation pattern with a home screen (Pokémon list) and explore screen (about page).
 
