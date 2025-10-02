@@ -1,4 +1,4 @@
-import { StyleSheet, View, StatusBar } from 'react-native';
+import { Linking, StyleSheet, View, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ export default function AboutScreen() {
         </View>
       </SafeAreaView>
 
-      <ThemedView style={styles.content}>
+      <ScrollView style={styles.content}>
         <ThemedText style={styles.paragraph}>
           欢迎使用宝可梦图鉴应用！这是一个基于 Expo 和 React Native 开发的移动应用程序，
           旨在为宝可梦爱好者提供一个简洁、易用的宝可梦信息查询工具。
@@ -59,7 +59,24 @@ export default function AboutScreen() {
         <ThemedText style={styles.paragraph}>
           这是一个开源项目，旨在展示如何使用 Expo 和 React Native 构建跨平台移动应用。
         </ThemedText>
-      </ThemedView>
+
+        <ThemedText type="subtitle" style={styles.subtitle}>
+          项目信息
+        </ThemedText>
+
+        <TouchableOpacity
+          style={styles.linkContainer}
+          onPress={() => Linking.openURL('https://github.com/BosenY/pokemon-dex')}
+        >
+          <ThemedText style={[styles.paragraph, styles.link]}>
+            项目地址: github.com/BosenY/pokemon-dex
+          </ThemedText>
+        </TouchableOpacity>
+
+        <ThemedText style={styles.paragraph}>
+          🤖 此项目使用 Claude Code 开发 - 完全由AI助手编写和维护的代码库。
+        </ThemedText>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -97,6 +114,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 15,
     fontSize: 16,
+  },
+  link: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
+  linkContainer: {
+    marginBottom: 15,
   },
   techList: {
     marginBottom: 15,
