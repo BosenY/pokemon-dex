@@ -95,6 +95,35 @@ export async function fetchPokemonByName(name: string): Promise<Pokemon> {
 }
 
 /**
+ * 获取栖息地的中文名称
+ * @param habitatUrl 栖息地URL
+ * @returns Promise<string>
+ */
+async function fetchHabitatChineseName(habitatUrl: string): Promise<string> {
+  try {
+    const response = await fetch(habitatUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const habitatData = await response.json();
+
+    // 过滤出中文名称
+    if (habitatData.names) {
+      const zhName = habitatData.names.find((name: any) =>
+        name.language.name === 'zh-Hans' || name.language.name === 'zh-Hant'
+      );
+      if (zhName) {
+        return zhName.name;
+      }
+    }
+    return habitatData.name;
+  } catch (error) {
+    console.error('Error fetching habitat chinese name:', error);
+    return '';
+  }
+}
+
+/**
  * 获取宝可梦物种信息（中文）
  * @param id 宝可梦ID
  * @returns Promise<PokemonSpecies>
@@ -135,6 +164,11 @@ export async function fetchPokemonSpecies(id: number): Promise<PokemonSpecies> {
       if (zhGenus) {
         speciesData.genus = zhGenus.genus;
       }
+    }
+
+    // 获取栖息地的中文名称
+    if (speciesData.habitat?.url) {
+      speciesData.habitat.chineseName = await fetchHabitatChineseName(speciesData.habitat.url);
     }
 
     return speciesData;
@@ -261,23 +295,25 @@ async function processEvolutionChainWithChineseNames(chain: any): Promise<void> 
   }
 
   // 处理进化条件中的道具中文名称
-  for (const detail of chain.evolution_details) {
-    if (detail.item?.url) {
-      try {
-        const itemResponse = await fetch(detail.item.url);
-        if (itemResponse.ok) {
-          const itemData = await itemResponse.json();
-          const chineseName = getPokemonChineseName(itemData);
-          detail.item.chineseName = chineseName;
+  if (chain.evolution_details && Array.isArray(chain.evolution_details)) {
+    for (const detail of chain.evolution_details) {
+      if (detail.item?.url) {
+        try {
+          const itemResponse = await fetch(detail.item.url);
+          if (itemResponse.ok) {
+            const itemData = await itemResponse.json();
+            const chineseName = getPokemonChineseName(itemData);
+            detail.item.chineseName = chineseName;
+          }
+        } catch (error) {
+          console.error('Error fetching item data:', error);
         }
-      } catch (error) {
-        console.error('Error fetching item data:', error);
       }
-    }
 
-    // 添加进化触发条件的中文名称
-    if (detail.trigger?.name) {
-      detail.trigger.chineseName = getEvolutionTriggerChineseName(detail.trigger.name);
+      // 添加进化触发条件的中文名称
+      if (detail.trigger?.name) {
+        detail.trigger.chineseName = getEvolutionTriggerChineseName(detail.trigger.name);
+      }
     }
   }
 

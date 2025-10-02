@@ -55,6 +55,7 @@ export interface PokemonSpecies {
   habitat: {
     name: string;
     url: string;
+    chineseName?: string;
   } | null;
   is_baby: boolean;
   is_legendary: boolean;
@@ -62,6 +63,8 @@ export interface PokemonSpecies {
   evolution_chain: {
     url: string;
   };
+  genus?: string;
+  flavor_text?: string;
 }
 
 export interface EvolutionChain {

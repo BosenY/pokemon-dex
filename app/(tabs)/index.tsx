@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { FlatList, StyleSheet, View, ActivityIndicator, Pressable, StatusBar } from 'react-native';
-import { Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { fetchPokemonList, fetchPokemonById, fetchPokemonSpecies, getPokemonImageUrl, getPokemonTypeColor, getTypeNameTranslation } from '@/services/pokemon-service';
+import { fetchPokemonById, fetchPokemonList, fetchPokemonSpecies, getPokemonImageUrl, getPokemonTypeColor, getTypeNameTranslation } from '@/services/pokemon-service';
 import { Image } from 'expo-image';
+import { Link } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface PokemonListItem {
@@ -230,6 +230,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 10,
   },
   safeArea: {
     backgroundColor: '#fff',
@@ -268,14 +269,14 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingVertical: 10,
-    paddingHorizontal: 5,
+    paddingHorizontal: 10,
   },
   pokemonCard: {
     marginVertical: 10,
-    marginHorizontal: 15,
+    marginHorizontal: 25,
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 15,
+    padding: 25,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -291,7 +292,7 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: '#f0f0f0',
-    marginHorizontal: 15,
+    marginHorizontal: 20,
     marginVertical: 5,
   },
   pokemonInfoContainer: {

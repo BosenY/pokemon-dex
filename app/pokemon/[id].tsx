@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, ScrollView, Dimensions, Pressable, TouchableOpacity } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, ActivityIndicator, ScrollView, Dimensions, Pressable, TouchableOpacity, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,6 +8,7 @@ import { Pokemon, PokemonSpecies, EvolutionChain, EvolutionDetail } from '@/type
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -20,6 +21,7 @@ export default function PokemonDetailScreen() {
   const [abilityNames, setAbilityNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (id) {
@@ -71,14 +73,16 @@ export default function PokemonDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            </Pressable>
-            <ThemedText type="title" style={styles.headerTitle}>
-              宝可梦详情
-            </ThemedText>
-            <View style={styles.backButton} />
+          <View style={[styles.simpleHeader, { backgroundColor: '#f8f8f8' }]}>
+            <View style={styles.header}>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="#007AFF" />
+              </Pressable>
+              <ThemedText type="title" style={styles.headerTitle}>
+                宝可梦详情
+              </ThemedText>
+              <View style={styles.backButton} />
+            </View>
           </View>
         </SafeAreaView>
         <View style={styles.loadingContainer}>
@@ -90,12 +94,24 @@ export default function PokemonDetailScreen() {
 
   const renderEvolutionChain = (chain: EvolutionDetail) => {
     // 递归渲染进化链节点
-    const renderEvolutionNode = (evolution: EvolutionDetail, level: number = 0) => {
+    const renderEvolutionNode = (evolution: EvolutionDetail, level: number = 0, evolutionRequirementText?: string) => {
       const pokemonId = parseInt(evolution.species.url.split('/')[6]);
 
       return (
         <View key={`${evolution.species.name}-${level}`} style={styles.evolutionItem}>
           <View style={styles.evolutionNodeContainer}>
+            {/* 显示进化条件（如果是从上一级传递下来的） */}
+            {level > 0 && evolutionRequirementText && (
+              <View style={styles.evolutionRequirementContainer}>
+                <View style={styles.evolutionRequirement}>
+                  <Ionicons name="arrow-forward" size={16} color="#666" />
+                  <ThemedText style={styles.evolutionCondition}>
+                    {evolutionRequirementText}
+                  </ThemedText>
+                </View>
+              </View>
+            )}
+
             <TouchableOpacity
               style={styles.evolutionImageContainer}
               onPress={() => {
@@ -117,24 +133,24 @@ export default function PokemonDetailScreen() {
             {/* 渲染所有进化路径 */}
             <View style={styles.evolutionPathsContainer}>
               {evolution.evolves_to.map((nextEvolution, index) => {
-                // 获取进化条件
-                let evolutionRequirement = null;
-                if (evolution.evolution_details.length > 0) {
-                  evolutionRequirement = evolution.evolution_details[0];
+                // 获取进化条件 - 从下一级宝可梦的进化详情获取而不是当前级
+                // 处理多个进化详情的情况，合并所有条件
+                let evolutionRequirements = [];
+                if (nextEvolution.evolution_details && Array.isArray(nextEvolution.evolution_details)) {
+                  for (const detail of nextEvolution.evolution_details) {
+                    const requirementText = getEvolutionRequirementText(detail);
+                    if (requirementText) {
+                      evolutionRequirements.push(requirementText);
+                    }
+                  }
                 }
+                const nextEvolutionRequirementText = evolutionRequirements.join(', ');
 
                 return (
                   <View key={`${nextEvolution.species.name}-${index}`} style={styles.evolutionPath}>
-                    {evolutionRequirement && (
-                      <View style={styles.evolutionRequirement}>
-                        <Ionicons name="arrow-forward" size={16} color="#666" />
-                        <ThemedText style={styles.evolutionCondition}>
-                          {getEvolutionRequirementText(evolutionRequirement)}
-                        </ThemedText>
-                      </View>
-                    )}
                     <View style={styles.evolutionNextContainer}>
-                      {renderEvolutionNode(nextEvolution, level + 1)}
+                      {/* 递归渲染下一个宝可梦，将进化条件传递下去 */}
+                      {renderEvolutionNode(nextEvolution, level + 1, nextEvolutionRequirementText)}
                     </View>
                   </View>
                 );
@@ -238,14 +254,16 @@ export default function PokemonDetailScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            </Pressable>
-            <ThemedText type="title" style={styles.headerTitle}>
-              宝可梦详情
-            </ThemedText>
-            <View style={styles.backButton} />
+          <View style={[styles.simpleHeader, { backgroundColor: '#f8f8f8' }]}>
+            <View style={styles.header}>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="#007AFF" />
+              </Pressable>
+              <ThemedText type="title" style={styles.headerTitle}>
+                宝可梦详情
+              </ThemedText>
+              <View style={styles.backButton} />
+            </View>
           </View>
         </SafeAreaView>
         <View style={styles.errorContainer}>
@@ -258,28 +276,54 @@ export default function PokemonDetailScreen() {
   const primaryType = pokemon.types[0]?.type.name || 'normal';
   const backgroundColor = getPokemonTypeColor(primaryType);
   const chineseName = species?.name || pokemon.name;
+  const typeColors = pokemon.types.map(type => getPokemonTypeColor(type.type.name));
+
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor }]} contentContainerStyle={styles.contentContainer}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
-          <ThemedText type="title" style={[styles.headerTitle, styles.headerTitleWhite]}>
-            {chineseName}
-          </ThemedText>
-          <View style={styles.backButton} />
-        </View>
-      </SafeAreaView>
+    <View style={[styles.container, { backgroundColor }]}>
+      <Animated.ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* 页面标题栏 - 会滚动并吸顶 */}
+        <Animated.View style={[
+          styles.simpleHeader,
+          {
+            backgroundColor: backgroundColor,
+            transform: [{
+              translateY: scrollY.interpolate({
+                inputRange: [0, 100],
+                outputRange: [0, -100],
+                extrapolate: 'clamp',
+              })
+            }]
+          }
+        ]}>
+          <SafeAreaView>
+            <View style={styles.header}>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="#fff" />
+              </Pressable>
+              <ThemedText type="title" style={[styles.headerTitle, styles.headerTitleWhite]}>
+                {chineseName}
+              </ThemedText>
+              <View style={styles.backButton} />
+            </View>
+          </SafeAreaView>
+        </Animated.View>
 
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: getPokemonImageUrl(pokemon.id) }}
-          style={styles.image}
-          contentFit="contain"
-        />
-      </View>
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: getPokemonImageUrl(pokemon.id) }}
+            style={styles.image}
+            contentFit="contain"
+          />
+        </View>
 
       <View style={styles.infoContainer}>
         <View style={styles.typesContainer}>
@@ -300,11 +344,11 @@ export default function PokemonDetailScreen() {
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <ThemedText style={styles.statLabel}>身高</ThemedText>
-              <ThemedText style={styles.statValue}>{(pokemon.height / 10).toFixed(1)} m</ThemedText>
+              <ThemedText style={[styles.statValue, { width: 'auto', flex: 1 }]}>{(pokemon.height / 10).toFixed(1)} m</ThemedText>
             </View>
             <View style={styles.statItem}>
               <ThemedText style={styles.statLabel}>体重</ThemedText>
-              <ThemedText style={styles.statValue}>{(pokemon.weight / 10).toFixed(1)} kg</ThemedText>
+              <ThemedText style={[styles.statValue, { width: 'auto', flex: 1 }]}>{(pokemon.weight / 10).toFixed(1)} kg</ThemedText>
             </View>
           </View>
         </View>
@@ -383,7 +427,7 @@ export default function PokemonDetailScreen() {
                 <View style={styles.speciesItem}>
                   <ThemedText style={styles.statLabel}>栖息地</ThemedText>
                   <ThemedText style={styles.statValue}>
-                    {species.habitat.name.charAt(0).toUpperCase() + species.habitat.name.slice(1)}
+                    {species.habitat.chineseName || species.habitat.name.charAt(0).toUpperCase() + species.habitat.name.slice(1)}
                   </ThemedText>
                 </View>
               )}
@@ -400,8 +444,9 @@ export default function PokemonDetailScreen() {
           </View>
         )}
       </View>
-    </ScrollView>
-  );
+    </Animated.ScrollView>
+  </View>
+);
 }
 
 const styles = StyleSheet.create({
@@ -409,17 +454,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'transparent',
   },
   contentContainer: {
     paddingBottom: 20,
+  },
+  simpleHeader: {
+    height: 60,
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 10,
   },
   backButton: {
     width: 40,
@@ -589,6 +643,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: '#333',
+    textAlign: 'justify',
   },
   evolutionContainer: {
     marginTop: 20,
@@ -636,10 +691,15 @@ const styles = StyleSheet.create({
   evolutionNextContainer: {
     flexDirection: 'row',
   },
+  evolutionRequirementContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+  },
   evolutionRequirement: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 5,
     backgroundColor: '#e0e0e0',
     borderRadius: 8,
     paddingHorizontal: 6,
