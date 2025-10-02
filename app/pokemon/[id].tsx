@@ -400,7 +400,7 @@ export default function PokemonDetailScreen() {
                 <View style={styles.speciesInfo}>
                   <View style={styles.speciesItem}>
                     <ThemedText style={styles.statLabel}>分类</ThemedText>
-                    <ThemedText style={styles.statValue}>{species.genus}</ThemedText>
+                    <ThemedText style={[styles.statValue, { width: 'auto', flex: 1 }]}>{species.genus}</ThemedText>
                   </View>
                 </View>
               </>
