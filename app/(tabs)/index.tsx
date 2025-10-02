@@ -1,98 +1,355 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { FlatList, StyleSheet, View, ActivityIndicator, Pressable, StatusBar } from 'react-native';
+import { Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { fetchPokemonList, fetchPokemonById, fetchPokemonSpecies, getPokemonImageUrl, getPokemonTypeColor, getTypeNameTranslation } from '@/services/pokemon-service';
+import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+interface PokemonListItem {
+  id: number;
+  name: string;
+  url: string;
+  types?: string[];
+  chineseName?: string;
+}
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [pokemonList, setPokemonList] = useState<PokemonListItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+  // 用于防止重复触发加载
+  const isLoadingMore = useRef(false);
+
+  const limit = 20;
+
+  const loadPokemon = useCallback(async (loadMore = false) => {
+    // 防止重复加载
+    if (loadMore) {
+      if (!hasMore || isLoadingMore.current) return;
+      isLoadingMore.current = true;
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const response = await fetchPokemonList(limit, loadMore ? offset : 0);
+
+      const pokemonData = response.results.map((pokemon) => {
+        // 从URL中提取ID: https://pokeapi.co/api/v2/pokemon/1/
+        const id = parseInt(pokemon.url.split('/')[6]);
+        return {
+          id,
+          name: pokemon.name,
+          url: pokemon.url,
+        };
+      });
+
+      // 获取每个宝可梦的详细信息以获取类型和中文名称
+      const pokemonWithTypes = await Promise.all(
+        pokemonData.map(async (pokemon) => {
+          try {
+            const details = await fetchPokemonById(pokemon.id);
+            const species = await fetchPokemonSpecies(pokemon.id);
+            return {
+              ...pokemon,
+              types: details.types.map((type: any) => type.type.name),
+              chineseName: species.name || pokemon.name,
+            };
+          } catch (err) {
+            console.error(`Error fetching details for pokemon ${pokemon.id}:`, err);
+            return pokemon;
+          }
+        })
+      );
+
+      if (loadMore) {
+        // 确保不添加重复的宝可梦
+        const existingIds = new Set(pokemonList.map(p => p.id));
+        const newUniquePokemon = pokemonWithTypes.filter(p => !existingIds.has(p.id));
+        setPokemonList(prev => [...prev, ...newUniquePokemon]);
+      } else {
+        setPokemonList(pokemonWithTypes);
+      }
+
+      setOffset(loadMore ? offset + limit : limit);
+      setHasMore(response.next !== null);
+    } catch (err) {
+      setError('获取宝可梦数据失败');
+      console.error(err);
+    } finally {
+      if (loadMore) {
+        isLoadingMore.current = false;
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [offset, hasMore, pokemonList]);
+
+  useEffect(() => {
+    loadPokemon();
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    // 添加额外的检查以防止重复加载
+    if (hasMore && !loadingMore && !isLoadingMore.current) {
+      loadPokemon(true);
+    }
+  }, [hasMore, loadingMore, loadPokemon]);
+
+  const renderPokemonItem = ({ item }: { item: PokemonListItem }) => {
+    return (
+      <Link href={`/pokemon/${item.id}`} asChild>
+        <Pressable
+          style={({ pressed }) => [
+            styles.pokemonCard,
+            pressed && styles.pokemonCardPressed
+          ]}
+        >
+          <View style={styles.pokemonInfoContainer}>
+            <View style={styles.pokemonInfo}>
+              <View style={styles.pokemonHeader}>
+                <ThemedText style={styles.pokemonId}>#{item.id.toString().padStart(3, '0')}</ThemedText>
+                <ThemedText style={styles.pokemonName}>
+                  {item.chineseName || item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.pokemonNameEn}>
+                {item.name}
+              </ThemedText>
+              {item.types && item.types.length > 0 && (
+                <View style={styles.typesContainer}>
+                  {item.types.map((type) => (
+                    <View
+                      key={type}
+                      style={[styles.typeBadge, { backgroundColor: getPokemonTypeColor(type) }]}
+                    >
+                      <ThemedText style={styles.typeText}>
+                        {getTypeNameTranslation(type)}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            <View style={styles.pokemonImageContainer}>
+              <Image
+                source={{ uri: getPokemonImageUrl(item.id) }}
+                style={styles.pokemonImage}
+                contentFit="contain"
+              />
+            </View>
+          </View>
+        </Pressable>
+      </Link>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator size="small" />
+      </View>
+    );
+  };
+
+  if (loading && pokemonList.length === 0) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <ThemedText type="title" style={styles.headerTitle}>
+              宝可梦图鉴
+            </ThemedText>
+          </View>
+        </SafeAreaView>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" style={styles.loading} />
+        </View>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+    );
+  }
+
+  if (error) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <ThemedText type="title" style={styles.headerTitle}>
+              宝可梦图鉴
+            </ThemedText>
+          </View>
+        </SafeAreaView>
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>错误: {error}</ThemedText>
+        </View>
       </ThemedView>
-    </ParallaxScrollView>
+    );
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <ThemedText type="title" style={styles.headerTitle}>
+            宝可梦图鉴
+          </ThemedText>
+        </View>
+      </SafeAreaView>
+      <FlatList
+        data={pokemonList}
+        renderItem={({ item, index }) => (
+          <>
+            {renderPokemonItem({ item })}
+            {index < pokemonList.length - 1 && <View style={styles.separator} />}
+          </>
+        )}
+        keyExtractor={(item) => `pokemon-${item.id}`}
+        contentContainerStyle={styles.listContainer}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    backgroundColor: '#fff',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  listContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+  },
+  pokemonCard: {
+    marginVertical: 10,
+    marginHorizontal: 15,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  pokemonCardPressed: {
+    backgroundColor: '#f0f0f0',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 15,
+    marginVertical: 5,
+  },
+  pokemonInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    minHeight: 80,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  pokemonInfo: {
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  pokemonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  pokemonId: {
+    fontSize: 11,
+    color: '#888',
+    marginRight: 10,
+    fontFamily: 'monospace',
+  },
+  pokemonImageContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pokemonImage: {
+    width: 65,
+    height: 65,
+  },
+  pokemonName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pokemonNameEn: {
+    fontSize: 13,
+    color: '#666',
+    textTransform: 'capitalize',
+    marginBottom: 5,
+  },
+  typesContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  typeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  footer: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
